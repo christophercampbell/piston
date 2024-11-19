@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os"
+	"os/signal"
 	"time"
 
 	"github.com/0xPolygon/maera/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 )
 
@@ -21,16 +24,67 @@ func Run(cli *cli.Context) error {
 	fmt.Printf("engineUrl: %s\n", engineUrl)
 	fmt.Printf("jwtPath: %s\n", jwtPath)
 
-	return createNextBlock(cli.Context, jwtPath, ethUrl, engineUrl)
+	runner := &Runner{
+		ctx:       cli.Context,
+		jwtPath:   jwtPath,
+		ethUrl:    ethUrl,
+		engineUrl: engineUrl,
+		stop:      make(chan struct{}),
+	}
+
+	go runner.createBlocks()
+
+	waitSignal()
+
+	close(runner.stop)
+
+	return runner.lastError
 }
 
-func createNextBlock(ctx context.Context, jwtPath, ethUrl, engineUrl string) error {
+func waitSignal() {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt)
+	for sig := range signals {
+		switch sig {
+		case os.Interrupt, os.Kill:
+			log.Info("terminating..")
+			return
+		}
+	}
+}
 
-	_, latest, err := getLatestBlockInfo(ctx, ethUrl)
+type Runner struct {
+	ctx                        context.Context
+	jwtPath, ethUrl, engineUrl string
+	stop                       chan struct{}
+	lastError                  error
+}
+
+func (r *Runner) createBlocks() {
+	r.createNextBlockSafe()
+	for {
+		select {
+		case <-time.NewTimer(time.Second * 10).C:
+			r.createNextBlockSafe()
+		case <-r.stop:
+			return
+		}
+	}
+}
+
+func (r *Runner) createNextBlockSafe() {
+	if err := r.createNextBlock(); err != nil {
+		fmt.Println("error creating block", err)
+		r.lastError = err
+	}
+}
+
+func (r *Runner) createNextBlock() error {
+	_, latest, err := getLatestBlockInfo(r.ctx, r.ethUrl)
 	if err != nil {
 		return err
 	}
-	ec, err := engine.NewEngineClient(engineUrl, jwtPath)
+	ec, err := engine.NewEngineClient(r.engineUrl, r.jwtPath)
 	if err != nil {
 		return err
 	}
