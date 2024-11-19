@@ -4,78 +4,49 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"os"
-	"os/signal"
 	"time"
 
 	"github.com/0xPolygon/maera/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 )
 
 func Run(cli *cli.Context) error {
-	jwtPath := processPath(cli.String(JWTKey))
-	engineUrl := orDefaultString(cli, EngineUrlKey, EngineUrlDefault)
-	ethUrl := orDefaultString(cli, EthUrlKey, EthUrlDefault)
-	fmt.Printf("ethUrl: %s\n", ethUrl)
-	fmt.Printf("engineUrl: %s\n", engineUrl)
-	fmt.Printf("jwtPath: %s\n", jwtPath)
-
 	runner := &Runner{
 		ctx:       cli.Context,
-		jwtPath:   jwtPath,
-		ethUrl:    ethUrl,
-		engineUrl: engineUrl,
-		stop:      make(chan struct{}),
+		jwtPath:   processPath(cli.String(JWTKey)),
+		ethUrl:    orDefaultString(cli, EthUrlKey, EthUrlDefault),
+		engineUrl: orDefaultString(cli, EngineUrlKey, EngineUrlDefault),
+		period:    time.Second * 10,
 	}
 
 	go runner.createBlocks()
 
-	waitSignal()
-
-	close(runner.stop)
+	// wait until interrupted. todo: externalize shutdown if necessary
+	<-make(chan struct{})
 
 	return runner.lastError
-}
-
-func waitSignal() {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt)
-	for sig := range signals {
-		switch sig {
-		case os.Interrupt, os.Kill:
-			log.Info("terminating..")
-			return
-		}
-	}
 }
 
 type Runner struct {
 	ctx                        context.Context
 	jwtPath, ethUrl, engineUrl string
-	stop                       chan struct{}
 	lastError                  error
+	period                     time.Duration
 }
 
 func (r *Runner) createBlocks() {
-	r.createNextBlockSafe()
+	fmt.Printf("ethUrl: %s\n", r.ethUrl)
+	fmt.Printf("engineUrl: %s\n", r.engineUrl)
+	fmt.Printf("jwtPath: %s\n", r.jwtPath)
 	for {
-		select {
-		case <-time.NewTimer(time.Second * 10).C:
-			r.createNextBlockSafe()
-		case <-r.stop:
-			return
+		if err := r.createNextBlock(); err != nil {
+			fmt.Println("error creating block", err)
+			r.lastError = err
 		}
-	}
-}
-
-func (r *Runner) createNextBlockSafe() {
-	if err := r.createNextBlock(); err != nil {
-		fmt.Println("error creating block", err)
-		r.lastError = err
+		<-time.NewTimer(r.period).C
 	}
 }
 
