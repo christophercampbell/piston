@@ -14,12 +14,16 @@ import (
 )
 
 func Run(cli *cli.Context) error {
+	period, err := validateDuration(cli, PeriodKey, PeriodDefault, PeriodMinimum)
+	if err != nil {
+		return err
+	}
 	runner := &Runner{
 		ctx:       cli.Context,
 		jwtPath:   processPath(cli.String(JWTKey)),
 		ethUrl:    orDefaultString(cli, EthUrlKey, EthUrlDefault),
 		engineUrl: orDefaultString(cli, EngineUrlKey, EngineUrlDefault),
-		period:    time.Second * 10,
+		period:    *period,
 	}
 
 	go runner.createBlocks()
@@ -38,9 +42,10 @@ type Runner struct {
 }
 
 func (r *Runner) createBlocks() {
-	fmt.Printf("ethUrl: %s\n", r.ethUrl)
-	fmt.Printf("engineUrl: %s\n", r.engineUrl)
-	fmt.Printf("jwtPath: %s\n", r.jwtPath)
+	fmt.Println("ethUrl:", r.ethUrl)
+	fmt.Println("engineUrl:", r.engineUrl)
+	fmt.Println("jwtPath:", r.jwtPath)
+	fmt.Println("period:", r.period)
 	for {
 		if err := r.createNextBlock(); err != nil {
 			fmt.Println("error creating block", err)

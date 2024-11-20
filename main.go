@@ -35,6 +35,12 @@ func main() {
 					Required:    false,
 					DefaultText: app.EngineUrlDefault,
 				},
+				&cli.DurationFlag{
+					Name:        app.PeriodKey,
+					Usage:       "block production rate in seconds",
+					Required:    false,
+					DefaultText: app.PeriodDefault.String(),
+				},
 			},
 		},
 	}
