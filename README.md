@@ -4,7 +4,7 @@ Utility to drive Ethereum's engine api without consensus
 #### build
 
 ```shell
-git clone https:// ...
+git clone git@github.com:christophercampbell/piston.git
 cd piston
 make build
 ```
@@ -53,12 +53,6 @@ Configure genesis for zeth such that it supports engine api v3. For example
     "cancunTime":1707305664
   },
   "alloc": {
-    "0x67b1d87101671b127f5f8714789C7192f7ad340e": {
-      "balance": "0xEEBE0B40E8000000"
-    },
-    "0xa94f5374Fce5edBC8E2a8697C15331677e6EbF0B": {
-      "balance": "0xEEBE0B40E8000000"
-    }
   },
   "coinbase": "0x0000000000000000000000000000000000000000",
   "difficulty": "0x01",
